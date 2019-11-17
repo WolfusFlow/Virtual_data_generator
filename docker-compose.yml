@@ -1,0 +1,102 @@
+version: '3'
+services:
+
+  generator:
+    build: ./generator
+    depends_on: 
+      - rabbitmq
+    links: 
+      - rabbitmq
+    restart: always
+    environment: 
+      - SERVER_NAME=First_Server
+      - AMQP_URL=rabbitmq
+      - ROUTING_KEY=dataqueue
+
+  generator0:
+    build: ./generator
+    depends_on: 
+      - rabbitmq
+    links: 
+      - rabbitmq
+    restart: always
+    environment: 
+      - SERVER_NAME=Second_Server
+      - AMQP_URL=rabbitmq
+      - ROUTING_KEY=dataqueue
+
+  generator1:
+    build: ./generator
+    depends_on: 
+      - rabbitmq
+    links: 
+      - rabbitmq
+    restart: always
+    environment: 
+      - SERVER_NAME=Third_Server
+      - AMQP_URL=rabbitmq
+      - ROUTING_KEY=dataqueue
+
+    
+  orchestrator:
+    build: ./orchestrator
+    depends_on: 
+      - rabbitmq
+      - postgres
+    links:
+      - rabbitmq
+      - postgres
+    restart: always
+    environment: 
+      - AMQP_URL=rabbitmq
+      - ROUTING_KEY=dataqueue
+      - POSTGRESQL=postgres
+      - DATABASE=data_db
+      - DB_USER=postgres_user
+      - DB_PASSWORD=password
+
+      
+  backend:
+    build: ./web/backend
+    command: bash -c "python manage.py makemigrations core"
+    command: bash -c "python manage.py migrate"
+    # command: bash -c "python manage.py createsuperuser" auto create admin? 
+    command: bash -c "python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    restart: always
+    links:
+      - postgres
+    environment: 
+      - DATA_DB=data_db
+      - DATA_DB_USER=data_db_user
+      - DATA_DB_USER_PASSWORD=password
+      - POSTGRESQL=postgres
+      - DATABASE_PORT=5432
+
+  
+  # frontend:
+
+
+  rabbitmq:
+    image: rabbitmq
+    restart: always
+
+
+  postgres:
+    build: ./database
+    image: postgres:latest
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment: 
+      - DATA_DB_USER=data_db_user
+      - DATA_DB_USER_PASSWORD=password
+      - DATA_DB=data_db
+      - POSTGRES_USER=postgres_user
+
+
+volumes:
+  postgres_data:
