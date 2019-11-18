@@ -2,7 +2,6 @@ import os
 import json
 import datetime as dt
 import pika
-import time
 import random
 
 ROUTING_KEY = os.environ['ROUTING_KEY']
@@ -25,10 +24,7 @@ def send_message(channel, data):
     # mb add a bit of delay / freeze and check delay_channel later
     channel.basic_publish(exchange='',
                       routing_key=ROUTING_KEY, 
-                      body=json.dumps({'data_type' : data.get('data_type'),
-                                       'value' : data.get('value'), 
-                                       'created_at': data.get('created_at'), 
-                                       'server_name': data.get('server_name')}))
+                      body=json.dumps(data))
     
 
 def generate_data(channel):
@@ -42,7 +38,8 @@ def generate_data(channel):
             'created_at' : created_at,
             'server_name' : SERVER_NAME
         }
-        send_message(channel, data)
+        # send_message(channel, data)
+
 
 if __name__ == '__main__':
     main()

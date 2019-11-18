@@ -29,9 +29,9 @@ def main():
         print(f'error in mq orchestrator connection: {error}') 
 
 
-def work_with_data(body):
+def work_with_data(data):
     #ckeck our data cut this later
-    print(body)
+    print(data)
     try:
         db_connection = psycopg2.connect(host     = POSTGRESQL,
                                          database = DATABASE, 
@@ -43,9 +43,27 @@ def work_with_data(body):
         #check connection cut this later
         print('postgres_version:::::\n\n')
         print(f'{db_version}\n\n')
+        #Write_to_database
+        # check_exist_table = 
+        create_table_query = '''CREATE TABLE virtual_data_table
+          (ID INT PRIMARY KEY     NOT NULL,
+          SERVER_NAME     TEXT    NOT NULL,
+          DATA_TYPE       TEXT    NOT NULL,
+          VALUE           TEXT    NOT NULL,
+          CREATED_AT      TIMESTAMP); '''
+        # cursor.execute(create_table_query)
+        # db_connection.commit()
+
+        insert_data_into_table = f'''INSERT INTO virtual_data_table
+          (SERVER_NAME, DATA_TYPE, VALUE, CREATED_AT) VALUES
+          ({data.server_name}, {data.data_type}, {data.value}, {data.created_at})'''
+        # cursor.execute(insert_data_into_table)
+        # db_connection.commit()
+
+        #Del_old_data_from_it
                                         
     except (Exception, psycopg2.DatabaseError) as error:
-        print(f'error in database orchestrator connection: {error}')
+        print(f'error in database orchestrator: {error}')
 
 
 if __name__ == "__main__":

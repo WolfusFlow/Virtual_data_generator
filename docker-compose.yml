@@ -60,7 +60,7 @@ services:
     build: ./web/backend
     command: bash -c "python manage.py makemigrations core"
     command: bash -c "python manage.py migrate"
-    # command: bash -c "python manage.py createsuperuser" auto create admin? 
+    command: bash -c "python manage.py createsuperuser --user $SUPER_ADMIN --password $SUPER_ADMIN_PASSWORD" 
     command: bash -c "python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"
@@ -73,6 +73,8 @@ services:
       - DATA_DB_USER_PASSWORD=password
       - POSTGRESQL=postgres
       - DATABASE_PORT=5432
+      - SUPER_ADMIN=root
+      - SUPER_ADMIN_PASSWORD=password
 
   
   # frontend:
