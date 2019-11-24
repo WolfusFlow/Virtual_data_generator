@@ -1,5 +1,7 @@
 import os
 import pika
+import json
+import datetime as dt
 import psycopg2
 
 AMPQ_URL    = os.environ['AMQP_URL']
@@ -7,7 +9,10 @@ ROUTING_KEY = os.environ['ROUTING_KEY']
 POSTGRESQL  = os.environ['POSTGRESQL']
 DATABASE    = os.environ['DATABASE']
 DB_USER     = os.environ['DB_USER']
-DB_PASSWORD = os.environ['DB_PASSWORD']
+# DB_PASSWORD = os.environ['DB_PASSWORD']
+TABLE_NAME  = os.environ['TABLE_NAME']
+
+life_time   = str(dt.datetime.now()-dt.timedelta(days=1)).split('.')[0]
 
 
 def main():
@@ -17,8 +22,7 @@ def main():
         channel.queue_declare(queue=ROUTING_KEY)
 
         def callback(ch, method, properties, body):
-            print(f'Received message: {body}')
-            work_with_data(body)
+            work_with_data(json.loads(body.decode('UTF-8')))
 
         channel.basic_consume(queue=ROUTING_KEY,
                               auto_ack=True,
@@ -35,32 +39,57 @@ def work_with_data(data):
     try:
         db_connection = psycopg2.connect(host     = POSTGRESQL,
                                          database = DATABASE, 
-                                         user     = DB_USER, 
-                                         password = DB_PASSWORD)
+                                         user     = DB_USER)#, 
+                                        #  password = DB_PASSWORD)
         cursor = db_connection.cursor()
         cursor.execute('SELECT version()')
         db_version = cursor.fetchone()
         #check connection cut this later
         print('postgres_version:::::\n\n')
         print(f'{db_version}\n\n')
+
         #Write_to_database
-        # check_exist_table = 
-        create_table_query = '''CREATE TABLE virtual_data_table
-          (ID INT PRIMARY KEY     NOT NULL,
-          SERVER_NAME     TEXT    NOT NULL,
-          DATA_TYPE       TEXT    NOT NULL,
-          VALUE           TEXT    NOT NULL,
-          CREATED_AT      TIMESTAMP); '''
-        # cursor.execute(create_table_query)
-        # db_connection.commit()
+        cursor.execute(f"select exists(select relname from pg_class where relname='{TABLE_NAME}')")
+        exists = cursor.fetchone()[0]
+        if not exists:
+            create_table_query = f'''CREATE TABLE {TABLE_NAME}
+              (DATA_ID INT GENERATED ALWAYS AS IDENTITY,
+              UUID            TEXT    NOT NULL,
+              SERVER_NAME     TEXT    NOT NULL,
+              DATA_TYPE       TEXT    NOT NULL,
+              VALUE           TEXT    NOT NULL,
+              CREATED_AT      TEXT    NOT NULL); '''
+            cursor.execute(create_table_query)
+            db_connection.commit()
 
-        insert_data_into_table = f'''INSERT INTO virtual_data_table
-          (SERVER_NAME, DATA_TYPE, VALUE, CREATED_AT) VALUES
-          ({data.server_name}, {data.data_type}, {data.value}, {data.created_at})'''
-        # cursor.execute(insert_data_into_table)
-        # db_connection.commit()
+        try:
+            insert_data_into_table = f'''INSERT INTO {TABLE_NAME}
+              (UUID, SERVER_NAME, DATA_TYPE, VALUE, CREATED_AT) VALUES
+              ('{data['data_id']}', '{data["server_name"]}', '{data["data_type"]}', '{data["value"]}', '{data["created_at"]}')'''
+            #wanna see the output  cut this later
+            print('this is inserting')
+            print(insert_data_into_table)
+            cursor.execute(insert_data_into_table)
+            db_connection.commit()
 
-        #Del_old_data_from_it
+        except Exception as e:
+            print(f'error on insert to database: {e}')
+
+        #Del_old_data_from_database
+        if data['created_at'] >= life_time:
+            try:
+                delete_data_from_table = f'''DELETE FROM {TABLE_NAME}
+                WHERE CREATED_AT >= '{life_time}'
+                '''
+                #WHERE >= TIMESTAMP 'yesterday' hmm should I do it through a query?
+                cursor.execute(delete_data_from_table)
+                db_connection.commit()
+
+            except Exception as e:
+                print(f'error on delete from database: {e}')
+
+        cursor.close()
+        db_connection.close()
                                         
     except (Exception, psycopg2.DatabaseError) as error:
         print(f'error in database orchestrator: {error}')
