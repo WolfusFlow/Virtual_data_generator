@@ -20,6 +20,6 @@ import core.urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include(
-        core.urls, namespace='core')),
+    # path('datalist/', include(
+        # core.urls, namespace='core')),
 ]

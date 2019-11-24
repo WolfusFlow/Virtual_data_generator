@@ -1,5 +1,5 @@
 from django.views.generic import ListView
-from core.models import Data
+from core.models import VirtualDataTable
 
-class DataList(ListView):
-    model = Data
+class DataList (ListView):
+    model = VirtualDataTable 

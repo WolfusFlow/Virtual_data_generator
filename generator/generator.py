@@ -18,6 +18,7 @@ def main():
         channel = connection.channel()
         while True:
             time_for_sleep = generate_data(channel)
+            print('TIME FOR SLEEP:')
             print(time_for_sleep)
             if time_for_sleep == TYPE_LIST[0]:
                 time.sleep(2)
