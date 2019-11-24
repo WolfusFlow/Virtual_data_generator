@@ -6,4 +6,7 @@ urlpatterns = [
     path('datalist',
          views.DataList.as_view(),
          name='DataList'),
+    path('hello',
+         views.HellowView.as_view(),
+         name='hello'),
 ]
