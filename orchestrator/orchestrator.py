@@ -1,106 +1,81 @@
 import os
-import pika
 import json
+import time
 import datetime as dt
+import logging
+
+import pika
 import psycopg2
 
-AMPQ_URL    = os.environ['AMQP_URL']
-ROUTING_KEY = os.environ['ROUTING_KEY']
-POSTGRESQL  = os.environ['POSTGRESQL']
-DATABASE    = os.environ['DATABASE']
-DB_USER     = os.environ['DB_USER']
-DB_PASSWORD = os.environ['DB_PASSWORD']
-TABLE_NAME  = os.environ['TABLE_NAME']
+from sqlalchemy import create_engine  
+from sqlalchemy import Column, String  
+from sqlalchemy.ext.declarative import declarative_base  
+from sqlalchemy.orm import sessionmaker
 
-life_time   = str(dt.datetime.now()-dt.timedelta(days=1)).split('.')[0]
+from database import Session, engine, Base
+from db_model import VirtualData
 
-
-def main():
-    try:
-        mq_connection = pika.BlockingConnection(pika.ConnectionParameters(host=AMPQ_URL))
-        channel = mq_connection.channel()
-        channel.queue_declare(queue=ROUTING_KEY)
-
-        def callback(ch, method, properties, body):
-            work_with_data(json.loads(body.decode('UTF-8')))
-
-        channel.basic_consume(queue=ROUTING_KEY,
-                              auto_ack=True,
-                              on_message_callback=callback)
-        channel.start_consuming()
-
-    except (Exception, pika.exceptions.AMQPConnectionError) as error:
-        print(f'error in mq orchestrator connection: {error}') 
+logging.basicConfig(filename="orchestrator_log_file",
+                    filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s \n\n',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
 
 
-def work_with_data(data):
-    #ckeck our data cut this later
-    print(data)
-    try:
-        db_connection = psycopg2.connect(host     = POSTGRESQL,
-                                         database = DATABASE, 
-                                         user     = DB_USER,
-                                         password = DB_PASSWORD)
-        cursor = db_connection.cursor()
-        cursor.execute('SELECT version()')
-        db_version = cursor.fetchone()
-        #check connection cut this later
-        print('postgres_version:::::\n\n')
-        print(f'{db_version}\n\n')
-        
-        #Check if table exist
-        cursor.execute(f"select exists(select relname from pg_class where relname='{TABLE_NAME}')")
-        exists = cursor.fetchone()[0]
-        if not exists:
-            create_table_query = f'''CREATE TABLE {TABLE_NAME}
-              (ID INT GENERATED ALWAYS AS IDENTITY,
-              UUID            TEXT    NOT NULL,
-              SERVER_NAME     TEXT    NOT NULL,
-              DATA_TYPE       TEXT    NOT NULL,
-              VALUE           INT     NOT NULL,
-              CREATED_AT      TEXT    NOT NULL); '''
-            cursor.execute(create_table_query)
-            db_connection.commit()
+class Rabbit_connection():
 
-        #Del_old_data_from_database
-        def delete_data_from_database(db_connection, cursor):
+    def __init__(self):
+        self.amqp_url    = os.environ['AMQP_URL']
+        self.routing_key = os.environ['ROUTING_KEY']
+        self.db_session  = Session() 
+
+    mq_connection = None
+    mq_channel    = None
+
+
+    def callback(self, channel, method, properties, body):
+
+        decoded_body = json.loads(body.decode('UTF-8'))
+
+        insert_to_database = VirtualData(decoded_body['data_id'], decoded_body['server_name'], 
+        decoded_body['data_type'], decoded_body['value'], decoded_body['created_at'])
+
+        logging.info(f'inserted data:::::::::\n {insert_to_database}')
+        self.db_session.add(insert_to_database)
+        self.db_session.commit()
+
+
+    def connect_consume(self):
+        try:
+            self.mq_connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.amqp_url))
+            self.mq_channel = self.mq_connection.channel()
+            self.mq_channel.queue_declare(queue=self.routing_key, durable=True)
+            self.mq_channel.basic_consume(queue=self.routing_key,
+                                          on_message_callback=self.callback,
+                                          auto_ack=True,)
             try:
-                delete_data_from_table = f'''DELETE FROM {TABLE_NAME}
-                WHERE CREATED_AT <= '{life_time}'
-                '''
-                #WHERE >= TIMESTAMP 'yesterday' hmm should I do it through a query?
-                cursor.execute(delete_data_from_table)
-                db_connection.commit()
+                self.mq_channel.start_consuming()
 
-            except Exception as e:
-                print(f'error on delete from database: {e}')
+            except KeyboardInterrupt:
+                self.mq_channel.stop_consuming()
 
-
-        def insert_data_into_database(db_connection, cursor):
-            try:
-                insert_data_into_table = f'''INSERT INTO {TABLE_NAME}
-                  (UUID, SERVER_NAME, DATA_TYPE, VALUE, CREATED_AT) VALUES
-                  ('{data['data_id']}', '{data["server_name"]}', '{data["data_type"]}', '{data["value"]}', '{data["created_at"]}')'''
-            #wanna see the output  cut this later
-                print('this is inserting')
-                print(insert_data_into_table)
-                cursor.execute(insert_data_into_table)
-                db_connection.commit()
-
-            except Exception as e:
-                print(f'error on insert to database: {e}')
-
-
+            self.mq_channel.close()
+            self.db_session.close()
         
-        insert_data_into_database(db_connection, cursor)
-        delete_data_from_database(db_connection, cursor)
-        cursor.close()
-        db_connection.close()
+        except pika.exceptions.AMQPConnectionError as error:
+            print(f'error in connection::::: {error}')
 
-                                        
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(f'error in database orchestrator: {error}')
+
+class Write_data_to_database():
+
+    def consume_from_queue_and_writedown(self):
+        logging.info('let\'s go')
+        mq_connection = Rabbit_connection()
+        mq_connection.connect_consume()
 
 
 if __name__ == "__main__":
-    main()
+    consume_and_write_object = Write_data_to_database()
+    while True:
+        consume_and_write_object.consume_from_queue_and_writedown()
+        time.sleep(1)
