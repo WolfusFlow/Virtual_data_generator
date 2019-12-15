@@ -1,10 +1,9 @@
 import os
 
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from . import VirtualData
+from .models import VirtualData
 
 class DataBaseConnection():
 
@@ -19,7 +18,6 @@ class DataBaseConnection():
     
     engine  = None
     session = None
-    Base    = None
 
     
     def connect(self):
@@ -29,10 +27,9 @@ class DataBaseConnection():
         self.engine = create_engine(db_string)
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
-        self.Base = declarative_base()
         
     def write_to_database(self, message):
-        insert_message = VirtualData.VirtualData(message)
+        insert_message = VirtualData(message)
         self.session.add(insert_message)
         self.session.commit()
 

@@ -3,8 +3,9 @@ import os
 from DataBaseConnection import Base
 
 from sqlalchemy import Column, String, Integer
+from sqlalchemy.ext.declarative import declarative_base
 
-class VirtualData(Base):
+class VirtualData(declarative_base):
     __tablename__ = os.environ['TABLE_NAME']
 
     id          = Column(Integer, primary_key=True)
