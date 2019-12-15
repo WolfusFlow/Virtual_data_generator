@@ -12,8 +12,8 @@ from sqlalchemy import Column, String
 from sqlalchemy.ext.declarative import declarative_base  
 from sqlalchemy.orm import sessionmaker
 
-from database import Session, engine, Base
-from db_model import VirtualData
+from database import DataBaseConnection
+# from database import VirtualData
 
 logging.basicConfig(filename="orchestrator_log_file",
                     filemode='a',
@@ -22,12 +22,13 @@ logging.basicConfig(filename="orchestrator_log_file",
                     level=logging.DEBUG)
 
 
-class Rabbit_connection():
+class MqItemConsumer():
 
     def __init__(self):
-        self.amqp_url    = os.environ['AMQP_URL']
-        self.routing_key = os.environ['ROUTING_KEY']
-        self.db_session  = Session() 
+        self.amqp_url      = os.environ['AMQP_URL']
+        self.routing_key   = os.environ['ROUTING_KEY']
+        self.db_connection = DataBaseConnection.DataBaseConnection()
+        # self.db_session    = self.db_connection.connect() 
 
     mq_connection = None
     mq_channel    = None
@@ -37,45 +38,35 @@ class Rabbit_connection():
 
         decoded_body = json.loads(body.decode('UTF-8'))
 
-        insert_to_database = VirtualData(decoded_body['data_id'], decoded_body['server_name'], 
-        decoded_body['data_type'], decoded_body['value'], decoded_body['created_at'])
-
-        logging.info(f'inserted data:::::::::\n {insert_to_database}')
-        self.db_session.add(insert_to_database)
-        self.db_session.commit()
+        logging.info(f'inserted data:::::::::\n {decoded_body}')
+        self.db_connection.write_to_database(decoded_body)
 
 
     def connect_consume(self):
         try:
-            self.mq_connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.amqp_url))
-            self.mq_channel = self.mq_connection.channel()
-            self.mq_channel.queue_declare(queue=self.routing_key, durable=True)
-            self.mq_channel.basic_consume(queue=self.routing_key,
-                                          on_message_callback=self.callback,
-                                          auto_ack=True,)
-            try:
-                self.mq_channel.start_consuming()
-
-            except KeyboardInterrupt:
-                self.mq_channel.stop_consuming()
-
-            self.mq_channel.close()
-            self.db_session.close()
-        
+            self.mq_connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=self.amqp_url))
         except pika.exceptions.AMQPConnectionError as error:
-            print(f'error in connection::::: {error}')
+            logging.exception(f'error in connection::::: {error}')
+        
+        if self.mq_connection.is_open:
+                self.mq_channel = self.mq_connection.channel()
+                self.mq_channel.queue_declare(queue=self.routing_key, durable=True)
+                self.mq_channel.basic_consume(queue=self.routing_key,
+                                              on_message_callback=self.callback,
+                                              auto_ack=True,)
+                try:
+                    self.mq_channel.start_consuming()
 
+                except KeyboardInterrupt:
+                    self.mq_channel.stop_consuming()
 
-class Write_data_to_database():
-
-    def consume_from_queue_and_writedown(self):
-        logging.info('let\'s go')
-        mq_connection = Rabbit_connection()
-        mq_connection.connect_consume()
+        self.mq_channel.close()
+        self.db_connection.close()
 
 
 if __name__ == "__main__":
-    consume_and_write_object = Write_data_to_database()
+    consume_and_write_object = MqItemConsumer()
     while True:
-        consume_and_write_object.consume_from_queue_and_writedown()
+        consume_and_write_object.connect_consume()
         time.sleep(1)
