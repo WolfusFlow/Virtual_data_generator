@@ -1,11 +1,9 @@
 import os
 
-from DataBaseConnection import Base
-
 from sqlalchemy import Column, String, Integer
 from sqlalchemy.ext.declarative import declarative_base
 
-class VirtualData(declarative_base):
+class VirtualData(declarative_base()):
     __tablename__ = os.environ['TABLE_NAME']
 
     id          = Column(Integer, primary_key=True)
@@ -16,7 +14,7 @@ class VirtualData(declarative_base):
     created_at  = Column(String)
 
     def __init__(self, *args, **kwargs):
-        self.uuid        = kwargs['uuid']
+        self.uuid        = kwargs['data_id']
         self.server_name = kwargs['server_name']
         self.data_type   = kwargs['data_type']
         self.value       = kwargs['value']

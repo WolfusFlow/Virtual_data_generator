@@ -29,7 +29,7 @@ class DataBaseConnection():
         self.session = Session()
         
     def write_to_database(self, message):
-        insert_message = VirtualData(message)
+        insert_message = VirtualData(**message)
         self.session.add(insert_message)
         self.session.commit()
 
