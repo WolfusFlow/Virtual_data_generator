@@ -22,10 +22,15 @@ logging.basicConfig(filename=__name__,
 
 class MqItemConsumer():
 
-    def __init__(self):
-        self.amqp_url      = os.environ['AMQP_URL']
-        self.routing_key   = os.environ['ROUTING_KEY']
-        self.db_connection = DataBaseConnection()
+    def __init__(self, *args, **kwargs):
+        try:
+            self.amqp_url    = kwargs['AMQP_URL']
+            self.routing_key = kwargs['ROUTING_KEY']
+
+        except KeyError as ke:
+            logging.exception(f'Exception in MqItemComsumer Initialization:\n {ke}')
+             
+        self.db_connection = DataBaseConnection(**kwargs)
         self.db_connection.connect()
 
     mq_connection = None
@@ -57,8 +62,8 @@ class MqItemConsumer():
                 except KeyboardInterrupt:
                     self.mq_channel.stop_consuming()
 
-        self.mq_channel.close()
-        self.db_connection.close()
+        self.stop()
+
 
     def stop(self):
         self.mq_channel.close()

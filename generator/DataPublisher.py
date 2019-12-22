@@ -17,7 +17,7 @@ class DataPublisher():
     publisher= None
 
     def __init__(self, *args, **kwargs):
-        self.publisher = MqPublisher()
+        self.publisher = MqPublisher(**kwargs)
         self.publisher.connect_to_rabbit()
 
 

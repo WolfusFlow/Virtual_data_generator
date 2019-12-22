@@ -4,9 +4,13 @@ import os
 from  DataPublisher import DataPublisher
 from  MessageType import MessageType
 
+def get_init_data():
+    data_dict = os.environ
+    return dict(data_dict)
 
 if __name__ == '__main__':
-    publisher = DataPublisher()
+    init_data = get_init_data()
+    publisher = DataPublisher(**init_data)
     while True:
         generated_message = publisher.generate_message()
 

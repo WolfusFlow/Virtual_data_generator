@@ -11,9 +11,12 @@ logging.basicConfig(filename=f"mqpublisher_{os.environ['SERVER_NAME']}_log_file"
 
 class MqPublisher():
 
-    def __init__(self):
-        self.ampq_url    = os.environ['AMQP_URL']
-        self.routing_key = os.environ['ROUTING_KEY']
+    def __init__(self, *args, **kwargs):
+        try:
+            self.ampq_url    = kwargs['AMQP_URL']
+            self.routing_key = kwargs['ROUTING_KEY']
+        except KeyError as ke:
+            logging.exception(f'Exception in MqItemComsumer Initialization:\n {ke}')
 
     mq_connection = None
     mq_channel = None

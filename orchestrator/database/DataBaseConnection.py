@@ -1,21 +1,30 @@
 import os
+import logging
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import VirtualData
 
+logging.basicConfig(filename=__name__,
+                    filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s \n\n',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
+
 class DataBaseConnection():
 
-    def __init__(self):
-        self.hostname          = os.environ['POSTGRESQL']
-        self.database          = os.environ['DATABASE']
-        self.database_port     = os.environ['DATABASE_PORT']
-        self.database_user     = os.environ['DB_USER']
-        self.database_password = os.environ['DB_PASSWORD']
-        self.table_name        = os.environ['TABLE_NAME']
+    def __init__(self, *args, **kwargs):
+        try:
+            self.hostname          = kwargs['POSTGRESQL']
+            self.database          = kwargs['DATABASE']
+            self.database_port     = kwargs['DATABASE_PORT']
+            self.database_user     = kwargs['DB_USER']
+            self.database_password = kwargs['DB_PASSWORD']
+            self.table_name        = kwargs['TABLE_NAME']
+        except KeyError as ke:
+            logging.exception(f'Exception in DataBaseConnection Initialization:\n {ke}')
 
-    
     engine  = None
     session = None
 
