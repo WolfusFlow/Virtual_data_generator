@@ -1,7 +1,7 @@
 version: '3'
 services:
 
-  generator0:
+  generator0: &generator
     build: ./generator
     depends_on: 
       - rabbitmq
@@ -14,29 +14,18 @@ services:
       - ROUTING_KEY=dataqueue
 
   generator1:
-    build: ./generator
-    depends_on: 
-      - rabbitmq
-    links: 
-      - rabbitmq
-    restart: always
+    << : *generator
     environment: 
       - SERVER_NAME=Second_Server
       - AMQP_URL=rabbitmq
       - ROUTING_KEY=dataqueue
 
   generator2:
-    build: ./generator
-    depends_on: 
-      - rabbitmq
-    links: 
-      - rabbitmq
-    restart: always
+    << : *generator
     environment: 
       - SERVER_NAME=Third_Server
       - AMQP_URL=rabbitmq
-      - ROUTING_KEY=dataqueue
-
+      - ROUTING_KEY=dataqueue 
     
   orchestrator:
     build: ./orchestrator
